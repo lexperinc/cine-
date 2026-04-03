@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CineVault | Her Yerde Çalışan Mod</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        :root {
+            --app-bg: #09090b;
+            --card-bg: rgba(24, 24, 27, 0.6);
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.5);
+        }
+
+        * { -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--app-bg);
+            color: #f4f4f5;
+            overflow-x: hidden;
+            overscroll-behavior-y: none;
+        }
+
+        .bg-gradient-blob {
+            position: fixed; top: -20%; right: -10%;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 60%);
+            filter: blur(50px); z-index: -1; opacity: 0.5;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+        }
+
+        .slide-up { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .slide-up.active { transform: translateY(0); }
+        
+        .fade-in { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .fade-in.active { opacity: 1; pointer-events: auto; }
+
+        #toast {
+            position: fixed; top: 20px; left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(39, 39, 42, 0.95); backdrop-filter: blur(10px);
+            color: white; padding: 14px 28px;
+            border-radius: 999px; font-size: 14px; font-weight: 600;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 9999; border: 1px solid rgba(255,255,255,0.1);
+            display: flex; align-items: center; gap: 10px; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        
+        /* Iframe Stilleri */
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body class="pb-24 antialiased selection:bg-violet-500/30">
+
+    <div class="bg-gradient-blob"></div>
+
+    <!-- Üst Bilgi -->
+    <header class="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 pt-safe pb-3 px-5 pt-5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                <i class="fas fa-play text-white text-sm ml-0.5"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">CineVault</h1>
+                <p id="stats" class="text-[11px] text-zinc-400 font-medium">0 İçerik</p>
+            </div>
+        </div>
+        <button onclick="clearAll()" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors active:scale-95">
+            <i class="fas fa-trash-alt text-sm"></i>
+        </button>
+    </header>
+
+    <!-- Ana İçerik Listesi -->
+    <main class="p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-bold text-zinc-500 uppercase tracking-widest">Kayıtlı Arşiv</h2>
+        </div>
+
+        <div id="linkContainer" class="flex flex-col gap-4"></div>
+
+        <!-- Boş Durum -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-24 text-center px-4 opacity-70">
+            <div class="w-20 h-20 mb-6 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800">
+                <i class="fas fa-film text-3xl text-zinc-600"></i>
+            </div>
+            <h3 class="text-lg font-bold mb-2">Listeniz Bomboş</h3>
+            <p class="text-sm text-zinc-500">Sağ alttaki butona tıklayarak arşive hemen video ekleyin.</p>
+        </div>
+    </main>
+
+    <!-- Yüzen Ekle Butonu -->
+    <button onclick="toggleAddModal(true)" class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-violet-600 hover:bg-violet-500 text-white rounded-full flex items-center justify-center text-xl shadow-[0_10px_30px_rgba(139,92,246,0.4)] transition-transform active:scale-90">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Ekleme Paneli -->
+    <div id="addModalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 fade-in flex items-end" onclick="toggleAddModal(false)">
+        <div class="w-full bg-zinc-900 border-t border-white/10 rounded-t-[30px] p-6 pb-safe slide-up shadow-2xl" onclick="event.stopPropagation()">
+            <div class="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto mb-6"></div>
+            <h3 class="text-xl font-bold mb-6">Yeni Video Ekle</h3>
+            
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide ml-1">İçerik Adı</label>
+                    <input type="text" id="linkTitle" placeholder="Örn: Hızlı ve Öfkeli 1080p" class="w-full bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl px-4 py-4 text-sm outline-none transition-colors text-white placeholder-zinc-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide ml-1">Bağlantı Adresi (URL)</label>
+                    <input type="url" id="linkUrl" placeholder="https://..." class="w-full bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl px-4 py-4 text-sm outline-none transition-colors text-white placeholder-zinc-600">
+                </div>
+            </div>
+
+            <button onclick="addLink()" class="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 active:scale-[0.98] text-white font-bold py-4 rounded-xl transition-transform flex items-center justify-center gap-2 shadow-lg shadow-violet-600/20">
+                <i class="fas fa-save"></i> Arşive Ekle
+            </button>
+        </div>
+    </div>
+
+    <!-- OYNATICI MODALI (Iframe ve Fallback destekli) -->
+    <div id="videoModal" class="fixed inset-0 bg-black z-[100] fade-in flex flex-col hidden">
+        
+        <!-- Üst Bar -->
+        <div class="flex items-center justify-between p-4 pt-safe bg-zinc-900/90 border-b border-white/5 shrink-0 z-20">
+            <button onclick="closePlayer()" class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 id="playerTitle" class="text-white text-sm font-bold truncate px-4">Video Adı</h3>
+            <!-- Harici tarayıcıda açma butonu (Kurtarıcı) -->
+            <button onclick="openExternal()" class="w-10 h-10 bg-violet-600 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform">
+                <i class="fas fa-external-link-alt text-xs"></i>
+            </button>
+        </div>
+
+        <!-- İçerik Alanı -->
+        <div id="playerContainer" class="relative w-full h-full flex items-center justify-center bg-zinc-950 flex-1 overflow-hidden">
+            <!-- Video, Iframe veya Hata Mesajı buraya gelecek -->
+        </div>
+    </div>
+
+    <!-- Bildirim -->
+    <div id="toast"><i class="fas fa-check-circle text-green-400"></i> <span id="toastMsg">İşlem başarılı</span></div>
+
+    <script>
+        let links = JSON.parse(localStorage.getItem('cinevault_data') || '[]');
+        let currentUrl = '';
+
+        function saveToStorage() {
+            localStorage.setItem('cinevault_data', JSON.stringify(links));
+            renderLinks();
+        }
+
+        // --- ARAYÜZ YARDIMCILARI ---
+        function toggleAddModal(show) {
+            const overlay = document.getElementById('addModalOverlay');
+            const panel = overlay.querySelector('.slide-up');
+            if (show) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => { overlay.classList.add('active'); panel.classList.add('active'); }, 10);
+            } else {
+                overlay.classList.remove('active'); panel.classList.remove('active');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = message;
+            toast.querySelector('i').className = isError ? 'fas fa-exclamation-circle text-red-400' : 'fas fa-check-circle text-green-400';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function copyLink(url) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(() => showToast('Bağlantı kopyalandı!'))
+                .catch(() => fallbackCopy(url));
+            } else {
+                fallbackCopy(url);
+            }
+        }
+
+        function fallbackCopy(text) {
+            let textArea = document.createElement("textarea");
+            textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); showToast('Bağlantı kopyalandı!'); } 
+            catch (err) { showToast('Kopyalama başarısız!', true); }
+            document.body.removeChild(textArea);
+        }
+
+        // --- VERİ İŞLEMLERİ ---
+        function addLink() {
+            const titleInput = document.getElementById('linkTitle');
+            const urlInput = document.getElementById('linkUrl');
+
+            if (!urlInput.value || !urlInput.value.startsWith('http')) {
+                showToast('Geçerli bir "http" bağlantısı girin!', true); return;
+            }
+
+            links.unshift({ id: Date.now(), title: titleInput.value || 'İsimsiz İçerik', url: urlInput.value, date: new Date().toISOString() });
+            titleInput.value = ''; urlInput.value = '';
+            saveToStorage(); toggleAddModal(false); showToast('Arşive eklendi!');
+        }
+
+        function deleteLink(id) {
+            if(confirm('Bu içeriği silmek istediğinize emin misiniz?')) {
+                links = links.filter(l => l.id !== id);
+                saveToStorage(); showToast('Silindi!');
+            }
+        }
+
+        function clearAll() {
+            if(links.length === 0) return;
+            if(confirm('Tüm arşivi kalıcı olarak silmek istiyor musunuz?')) {
+                links = []; saveToStorage(); showToast('Arşiv temizlendi!');
+            }
+        }
+
+        function getTimeInfo(dateStr) {
+            const diffMs = new Date() - new Date(dateStr);
+            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+            const mins = Math.floor((diffMs / 1000 / 60) % 60);
+
+            let healthPercent = Math.max(5, 100 - ((days / 30) * 100)); 
+            let color = healthPercent > 50 ? 'bg-green-400' : (healthPercent > 20 ? 'bg-yellow-400' : 'bg-red-500');
+            let text = days > 0 ? `${days}g ${hours}s` : (hours > 0 ? `${hours}s ${mins}d` : `${mins || 1} dk`);
+            
+            return { text, healthPercent, color };
+        }
+
+        function renderLinks() {
+            const container = document.getElementById('linkContainer');
+            const emptyState = document.getElementById('emptyState');
+            document.getElementById('stats').innerText = `${links.length} İçerik`;
+
+            if (links.length === 0) {
+                emptyState.classList.remove('hidden'); container.innerHTML = ''; return;
+            }
+            emptyState.classList.add('hidden');
+
+            container.innerHTML = links.map(link => {
+                const timeInfo = getTimeInfo(link.date);
+                return `
+                <div class="glass-card relative group transition-transform overflow-hidden">
+                    <div class="p-4 flex items-center gap-4 cursor-pointer active:bg-white/5" onclick="initPlayer('${link.url}', '${link.title.replace(/'/g, "\\'")}')">
+                        <div class="w-12 h-12 rounded-xl bg-zinc-800/80 flex items-center justify-center shrink-0 border border-white/5">
+                            <i class="fas fa-play text-violet-400 ml-1 text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0 pr-20">
+                            <h3 class="font-extrabold text-sm text-zinc-100 truncate mb-1">${link.title}</h3>
+                            <div class="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
+                                <span class="bg-zinc-800/80 px-2 py-1 rounded border border-white/5">
+                                    <i class="fas fa-clock text-violet-400"></i> Ömür: ${timeInfo.text}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute right-3 top-0 bottom-0 flex items-center gap-1 z-10 pointer-events-none">
+                        <button onclick="event.stopPropagation(); copyLink('${link.url}')" class="pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white bg-transparent hover:bg-white/10 active:scale-90 transition-all">
+                            <i class="fas fa-copy text-sm"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteLink(${link.id})" class="pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center text-zinc-500 hover:text-red-400 bg-transparent hover:bg-white/10 active:scale-90 transition-all">
+                            <i class="fas fa-trash text-sm"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="absolute bottom-0 left-0 h-1 ${timeInfo.color}" style="width: ${timeInfo.healthPercent}%"></div>
+                </div>
+            `}).join('');
+        }
+
+        // --- AKILLI OYNATICI LİGİĞİ (Anti-CORS & Fallback) ---
+        const videoModal = document.getElementById('videoModal');
+        const playerContainer = document.getElementById('playerContainer');
+
+        function initPlayer(url, title) {
+            currentUrl = url;
+            document.getElementById('playerTitle').innerText = title;
+            videoModal.classList.remove('hidden');
+            setTimeout(() => { videoModal.classList.add('active'); }, 10);
+            
+            playerContainer.innerHTML = ''; // Önceki içeriği temizle
+
+            // 1. İhtimal: URL açıkça bir mp4/mkv/webm ise doğrudan video etiketi kullanmayı dene
+            if (url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) {
+                playerContainer.innerHTML = `
+                    <video id="mainVideo" class="w-full h-full object-contain" playsinline controls>
+                        <source src="${url}">
+                        Tarayıcınız video etiketini desteklemiyor.
+                    </video>
+                `;
+                
+                const videoElement = document.getElementById('mainVideo');
+                
+                // Eğer video etiketi CORS veya başka bir sebeple hata verirse (Örn: QuickEdit içinde)
+                videoElement.onerror = function() {
+                    console.log("Video etiketi ile oynatılamadı. Iframe deneniyor...");
+                    loadIframe(url);
+                };
+
+            } else {
+                // 2. İhtimal: URL bir video dosyası değilse (html sayfasıysa) veya uzantısı yoksa direkt Iframe kullan
+                loadIframe(url);
+            }
+        }
+
+        function loadIframe(url) {
+            playerContainer.innerHTML = `
+                <iframe src="${url}" allowfullscreen sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+                <div class="absolute bottom-6 left-0 w-full flex justify-center pointer-events-none">
+                     <div class="bg-black/80 backdrop-blur text-xs text-white/70 px-4 py-2 rounded-full border border-white/10 pointer-events-auto shadow-xl flex items-center gap-2">
+                        <i class="fas fa-info-circle"></i> Açılmazsa sağ üstteki butonla tarayıcıda açın
+                     </div>
+                </div>
+            `;
+        }
+
+        function closePlayer() {
+            videoModal.classList.remove('active');
+            setTimeout(() => { 
+                videoModal.classList.add('hidden'); 
+                playerContainer.innerHTML = ''; // İçeriği tamamen silerek sesi/videoyu durdur
+            }, 300);
+        }
+
+        function openExternal() {
+            if(currentUrl) {
+                window.open(currentUrl, '_blank');
+                // Açıldıktan sonra buradaki ekranı istersen kapatabilirsin:
+                // closePlayer(); 
+            }
+        }
+
+        window.onload = renderLinks;
+        setInterval(renderLinks, 60000); 
+    </script>
+</body>
+</html>
+
+
